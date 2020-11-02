@@ -5,6 +5,8 @@ from .models import CustomUser
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from django.contrib.auth import login, logout
 import random
 import re
@@ -15,59 +17,37 @@ def generate_session_token(length=10):
     return ''.join(random.SystemRandom().choice([chr(i) for i in range(97, 123)] + [str(i) for i in range(10)]) for _ in range(length))
 
 
-@csrf_exempt
-def signin(request):
-    if not request.method == 'POST':
-        return JsonResponse({'error': 'Send a post request with valid paramenter only'})
-
-    # - if you will not get email, None will be printed
-    # print(request.POST.get('email', None))
-    # print(request.POST.get('password', None))
-
-    username = request.POST.get('email', None)
-    password = request.POST.get('password', None)
-
-    print(username)
-    print(password)
+@api_view(['GET'])
+def getAll(request):
+    querySet = CustomUser.objects.all().order_by('name')
+    serializer = UserSerializer(querySet, many=True)
+    return Response(serializer.data)
 
 
-# validation part
-    if username == None:
-        return JsonResponse({'error': 'Email required'}, 400)
-
-    if not re.match("^[\w\.\+\-]+\@[\w]+\.[a-z]{2,3}$", username):
-        return JsonResponse({'error': 'Enter a valid email'})
-
-    if len(password) < 3:
-        return JsonResponse({'error': 'Password needs to be at least of 3 char'})
-
-    UserModel = get_user_model()
-
-    try:
-        user = UserModel.objects.get(email=username)
-
-        if user.check_password(password):
-            usr_dict = UserModel.objects.filter(
-                email=username).values().first()
-            usr_dict.pop('password')
-
-            if user.session_token != "":
-                user.session_token = ""
-                user.save()
-                return JsonResponse({'error': "Previous session exists!"})
-
-            token = generate_session_token()
-            user.session_token = token
-            user.save()
-            login(request, user)
-            return JsonResponse({'token': token, 'user': usr_dict})
-        else:
-            return JsonResponse({'error': 'Invalid password'})
-
-    except UserModel.DoesNotExist:
-        return JsonResponse({'error': 'Invalid Email'})
+@api_view(['GET'])
+def getEach(request, id):
+    querySet = CustomUser.objects.get(id=id)
+    serializer = UserSerializer(querySet, many=False)
+    return Response(serializer.data)
 
 
+@api_view(['PUT'])
+def update(request, id):
+    querySet = CustomUser.objects.get(id=id)
+    serializer = UserSerializer(instance=querySet, data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(['DELETE'])
+def delete(request, id):
+    querySet = CustomUser.objects.get(id=id)
+    querySet.delete()
+    return Response('Item deleted')
+
+
+@api_view(['GET'])
 def signout(request, id):
     logout(request)
 
